@@ -22,11 +22,11 @@ async def chat(request: ChatRequest,
                db: AsyncSession = Depends(get_db)):
     """Handles chatbot queries and returns AI-generated responses."""
 
-    response = await process_chat_query(request.query)
+    response = process_chat_query(request.query)
 
     if not response:
         raise HTTPException(status_code=400, detail="Failed to generate response.")
-    await save_conversation(db, request.query, response.model_dump_json(), user.id)
+    await save_conversation(db, request.query, response, user.id)
     return {"response": response}
 
 @router.get("/history")

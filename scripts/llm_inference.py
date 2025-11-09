@@ -24,15 +24,15 @@ def generate_response(model, prompt):
 
     """
     try:
-        response = client.beta.chat.completions.parse(
+        response = client.responses.create(
             model=model,
-            messages=[
-                {"role": "system", "content": " You are an AI assistant trained on HDFS data. Identify the most relevant data sources."},
-                {"role": "user", "content": prompt},
-            ],
+            instructions ="You are an AI assistant trained to be a Human Resources Interviewer."
+                          "You are going to make a conversation with the user and decide whether he is a good candidate or not within 3-4 answers to your questions."
+                          "Once the use",
+            input=prompt
         )
 
-        return response.choices[0].message.content
+        return response.output_text
 
     except Exception as e:
         return f"OpenAI API Error: {str(e)}"

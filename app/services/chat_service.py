@@ -13,17 +13,10 @@ def process_chat_query(query: str):
 def build_prompt(query):
     """Builds a structured prompt for the LLM with strict filtering instructions."""
     prompt = f"""
-        You are an AI assistant trained to analyze data sources.
-        Identify the **most relevant** data sources based on the user's query.
-
-        **Query:** "{query}"
-
-        **Rules:**
-        - **Only return relevant sources.**
-        - **Do NOT summarize unrelated datasets.**
-        - **Return an empty list `[]` if no sources match.**
-
-        ### **Hive Metadata:**
+        **User message:** "{query}"
+        
+        **RULES**
+        
         """
 
     prompt += "\n****."
