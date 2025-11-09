@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.user_repository import create_user, get_user_by_username, get_user_by_email
-from app.services.user_service import hash_password, verify_password
+from app.services.user_service import hash_password, verify_password, create_openai_conversation
 from app.core.security import create_access_token
 from app.core.database import get_db
 from pydantic import BaseModel
@@ -15,6 +15,7 @@ class UserRegister(BaseModel):
     username: str
     email: str
     password: str
+    role: str
 
 # Request Model
 class UserLogin(BaseModel):
@@ -24,10 +25,11 @@ class UserLogin(BaseModel):
 
 @router.post("/register")
 async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
-    print(">>> register reached")
+    """Registers a new user with a hashed password."""
+
+    # Check if username or email already exists
     existing_user = await get_user_by_username(db, user_data.username)
     existing_email = await get_user_by_email(db, user_data.email)
-    print(">>> user/email checks done")
 
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists.")
@@ -35,10 +37,11 @@ async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered.")
 
     hashed_password = hash_password(user_data.password)
-    print(">>> hash complete")
 
-    user = await create_user(db, user_data.username, user_data.email, hashed_password)
-    print(">>> user created")
+    conversation_id = create_openai_conversation()
+    user = await create_user(db, user_data.username, user_data.email, hashed_password, conversation_id, user_data.role)
+    if not user:
+        raise HTTPException(status_code=500, detail="User registration failed.")
 
     return {"message": "Registration successful."}
 

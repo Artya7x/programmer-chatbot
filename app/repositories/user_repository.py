@@ -3,9 +3,9 @@ from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
 from app.models.user_models import User
 
-async def create_user(db: AsyncSession, username: str, email: str, hashed_password: str):
+async def create_user(db: AsyncSession, username: str, email: str, hashed_password: str, conv_id: str, user_role: str):
     """Inserts a new user into the database."""
-    new_user = User(username=username, email=email, password=hashed_password)
+    new_user = User(username=username, email=email, password=hashed_password, conversation_id=conv_id, role=user_role)
     db.add(new_user)
     try:
         await db.commit()
@@ -21,4 +21,15 @@ async def get_user_by_username(db: AsyncSession, username: str):
 
 async def get_user_by_email(db: AsyncSession, email: str):
     result = await db.execute(select(User).where(User.email == email))
+    return result.scalars().first()
+
+async def get_conversation_by_user_id(db: AsyncSession, user_id: int):
+    result = await db.execute(
+        select(
+            User.conversation_id
+        )
+        .where(
+            User.id == user_id
+        )
+    )
     return result.scalars().first()

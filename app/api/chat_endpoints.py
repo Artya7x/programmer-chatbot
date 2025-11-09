@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.repositories.user_repository import get_conversation_by_user_id
 from app.services.chat_service import process_chat_query
 from app.repositories.chat_repository import save_conversation,get_conversation_history
 from pydantic import BaseModel
@@ -21,9 +22,8 @@ async def chat(request: ChatRequest,
                user = Depends(get_current_user) ,
                db: AsyncSession = Depends(get_db)):
     """Handles chatbot queries and returns AI-generated responses."""
-
-    response = process_chat_query(request.query)
-
+    conversation_id = await get_conversation_by_user_id(db, user.id)
+    response = process_chat_query(request.query,conversation_id, user.role)
     if not response:
         raise HTTPException(status_code=400, detail="Failed to generate response.")
     await save_conversation(db, request.query, response, user.id)
