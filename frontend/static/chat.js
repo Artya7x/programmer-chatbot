@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     let isAIThinking = false;
 
+    checkDecisionStatus();
+
     messageInput.addEventListener('input', function () {
         this.style.height = 'auto';
         this.style.height = (this.scrollHeight) + 'px';
@@ -40,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const avatar = document.createElement('div');
     avatar.className = 'avatar bot-avatar';
-    avatar.textContent = 'DL';
+    avatar.textContent = 'AI';
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'content';
@@ -87,7 +89,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const data = await response.json();
-        return data.response;
+        return {
+            message: data.message,
+            decision: data.decision
+        };
+
     }
 
         async function sendMessage() {
@@ -107,33 +113,22 @@ document.addEventListener('DOMContentLoaded', function () {
 
             try {
                 const aiResponse = await getAIResponse(message);
-                const aiMessageElement = addMessage('', false);
+                const botMessage = aiResponse.message;
+                const decision = aiResponse.decision;
+
                 thinkingIndicator.remove();
 
-                let formatted = '';
+                let formatted = `<div class="response-card">${botMessage}</div>`;
 
-                if (typeof aiResponse === 'object' && Array.isArray(aiResponse.sources)) {
-                    if (aiResponse.sources.length === 0) {
-                        formatted = `
-                            <div class="response-card">No data sources found for your query.Try rephrasing or asking about a different domain</div>
-                        `;
-                    } else {
-                        formatted = `
-                            <div class="response-card">
-                                ${aiResponse.sources.map(src => `
-                                    <div class="entry">
-                                        <div class="path">Path: ${src.path}</div>
-                                        <div class="reason">Reason: ${src.reason}</div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        `;
-                    }
-                } else {
-                    formatted = `<div class="response-card">${aiResponse}</div>`;
-                }
 
+
+                const aiMessageElement = addMessage('', false);
                 aiMessageElement.innerHTML = formatted;
+                if (decision === "1" || decision === "0") {
+                    // Disable input and button
+                    messageInput.disabled = true;
+                    sendButton.disabled = true;
+                }
             } catch (error) {
                 console.error('AI error:', error);
                 const aiMessageElement = addMessage("Error: " + error.message, false);
@@ -226,4 +221,28 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.removeItem('access_token');
         window.location.href = '/login';
     });
+
+    async function checkDecisionStatus() {
+            const token = localStorage.getItem('access_token');
+            if (!token) return;
+
+            try {
+                const res = await fetch("/api/me", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+
+                if (!res.ok) return;
+
+                const data = await res.json();
+                if (data.decision === "1" || data.decision === "0") {
+
+                    messageInput.disabled = true;
+                    sendButton.disabled = true;
+
+                }
+            } catch (e) {
+                console.error("Failed to check decision status:", e);
+            }
+    }
+
 });

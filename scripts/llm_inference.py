@@ -13,12 +13,13 @@ if not OPENAI_API_KEY:
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# class ModelResponse(BaseModel):
-#     decision:
-#     response: str
+class ModelResponse(BaseModel):
+    decision: str
+    response: str
 
 def generate_response(model, prompt, conversation_id):
     """
+    TODO: revisit/refine the prompt for best results.
     Generate a response using OpenAI API with Structured Outputs.
 
     Args:
@@ -26,8 +27,9 @@ def generate_response(model, prompt, conversation_id):
         prompt (str): The user's query.
         conversation_id (str): The id of the current conversation. This is how the LLM knows context.
     """
+
     try:
-        response = client.responses.create(
+        response = client.responses.parse(
             model=model,
             instructions ="You are an AI assistant trained to be a Human Resources Interviewer."
                           "You are going to make a conversation with the user and decide whether he is a good candidate or not within 3-4 answers to your questions.\n\n"
@@ -44,10 +46,11 @@ def generate_response(model, prompt, conversation_id):
                 "type": "file_search",
                 "vector_store_ids": ["vs_6910d22afa4081918b2009351a3af3da"]
             }],
-            include=["file_search_call.results"]
+            include=["file_search_call.results"],
+            text_format=ModelResponse
         )
-
-        return response.output_text
+        print(response.output_parsed)
+        return response.output_parsed
 
     except Exception as e:
         return f"OpenAI API Error: {str(e)}"
