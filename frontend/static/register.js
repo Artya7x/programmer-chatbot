@@ -5,6 +5,7 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
     const confirmPassword = document.getElementById("confirm-password").value;
+    const role = document.getElementById("role").value
 
     const errorMsg = document.getElementById("error-msg");
     const successMsg = document.getElementById("success-msg");
@@ -21,7 +22,7 @@ document.getElementById("register-form").addEventListener("submit", async (e) =>
         const response = await fetch("/api/register", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, email, password })
+            body: JSON.stringify({ username, email, password, role })
         });
 
         // Read raw text first

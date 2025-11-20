@@ -9,6 +9,8 @@ class User:
     email String unique
     password String (hashed)
     created_at datetime
+    conversation_id String
+    role String
 """
 class User(Base):
     __tablename__ ='users'
@@ -18,3 +20,6 @@ class User(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     password = Column(String, nullable=False)
     created_at = Column(DateTime, default=func.now())
+    conversation_id = Column(String, unique=True, nullable=False)
+    role = Column(String, nullable=False)
+    decision = Column(String,nullable=True)
