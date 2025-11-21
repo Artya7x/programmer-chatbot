@@ -19,7 +19,7 @@ class ModelResponse(BaseModel):
 
 def generate_response(model, prompt, conversation_id):
     """
-    TODO: revisit/refine the prompt for best results.
+
     Generate a response using OpenAI API with Structured Outputs.
 
     Args:
