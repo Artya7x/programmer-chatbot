@@ -37,13 +37,13 @@ async def chat(request: ChatRequest,
         raise HTTPException(status_code=400, detail="Failed to generate response.")
 
     if user.role == "generate code":
-
         message_id = str(uuid.uuid4())
         subdir = f"u{user.id}/c{conversation_id}"
 
         cfg_path = None
         dfg_path = None
 
+        # start content with reasoning if available
         content = []
 
         if hasattr(response, "reasoning") and response.reasoning:
@@ -53,21 +53,41 @@ async def chat(request: ChatRequest,
                 "text": response.reasoning
             })
 
+        if response.python_code and response.python_code.strip():
+            content.append({
+                "type": "code",
+                "language": "python",
+                "text": response.python_code
+            })
+
         if response.cfg_graph and response.cfg_graph.strip():
             cfg_path = render_graph(response.cfg_graph, subdir, f"{message_id}_cfg")
+            content.append({
+                "type": "image",
+                "subtype": "cfg",
+                "url": cfg_path
+            })
 
         if response.dfg_graph and response.dfg_graph.strip():
             dfg_path = render_graph(response.dfg_graph, subdir, f"{message_id}_dfg")
+            content.append({
+                "type": "image",
+                "subtype": "dfg",
+                "url": dfg_path
+            })
 
-        await save_conversation(db=db,query=request.query,response=response.python_code,user_id=user.id,cfg_image_url=cfg_path,dfg_image_url=dfg_path, reasoning = response.reasoning)
-
-        content = [{"type": "code", "language": "python", "text": response.python_code}]
-        if cfg_path:
-            content.append({"type": "image", "subtype": "cfg", "url": cfg_path})
-        if dfg_path:
-            content.append({"type": "image", "subtype": "dfg", "url": dfg_path})
+        await save_conversation(
+            db=db,
+            query=request.query,
+            response=response.python_code,
+            user_id=user.id,
+            cfg_image_url=cfg_path,
+            dfg_image_url=dfg_path,
+            reasoning=response.reasoning
+        )
 
         return {"role": "assistant", "content": content}
+
 
     else:
         # TODO: implement other role logic here . :* <- this is an emoji ;)
@@ -81,7 +101,7 @@ async def conversation_history(user = Depends(get_current_user) ,db: AsyncSessio
 
     formatted_history = []
     for h in history:
-        message_text, response_text, cfg_url, dfg_url = h
+        message_text, response_text, cfg_url, dfg_url, reasoning = h
         entry = {
             "message": message_text,
             "response": response_text,
@@ -90,6 +110,9 @@ async def conversation_history(user = Depends(get_current_user) ,db: AsyncSessio
             entry["cfg_image_url"] = cfg_url
         if dfg_url:
             entry["dfg_image_url"] = dfg_url
+
+        if reasoning:
+            entry["reasoning"] = reasoning
         formatted_history.append(entry)
 
     return {"history": formatted_history}
