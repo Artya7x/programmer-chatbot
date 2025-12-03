@@ -9,15 +9,15 @@ app = FastAPI(
     description="An AI-powered chatbot for simulating a software engineering interview.",
     version="1.0.0"
 )
-app.mount("/home", StaticFiles(directory="frontend/home_page"), name="home")
+
 app.include_router(chatbot_router, prefix="/api")
 app.include_router(user_router, prefix="/api")
 
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
-
+app.mount("/graphs", StaticFiles(directory="app/static/graphs"), name="graphs")
 @app.get("/")
 def redirect_to_home():
-    return FileResponse("frontend/home_page/index.html")
+    return FileResponse("frontend/templates/login.html")
 
 @app.get("/register")
 def serve_register():

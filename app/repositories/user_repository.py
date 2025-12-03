@@ -15,12 +15,11 @@ async def create_user(db: AsyncSession, username: str, email: str, hashed_passwo
         await db.rollback()
         return None  # Username or email already exists
 
-async def save_applicant_decision(db: AsyncSession, user_id: int, decision: str):
+async def save_applicant_decision(db: AsyncSession, user_id: int):
     result = await db.execute(
         select(User).where(User.id == user_id)
     )
     user = result.scalar_one_or_none()
-    user.decision = decision
     db.add(user)
     await db.commit()
 

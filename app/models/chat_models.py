@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, func, Integer, ForeignKey, Text
+from sqlalchemy import Column, DateTime, func, Integer, ForeignKey, Text, String
 from app.core.database import Base
 
 """
@@ -16,4 +16,8 @@ class History(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     message_text = Column(Text, nullable=False)
     response_text = Column(Text, nullable=False)
+
+    cfg_image_url = Column(String, nullable=True)
+    dfg_image_url = Column(String, nullable=True)
+    reasoning = Column(String, nullable=False)
     timestamp = Column(DateTime, default=func.now())

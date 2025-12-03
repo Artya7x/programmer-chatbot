@@ -258,3 +258,24 @@ body {
 .logout-button:hover {
     background-color: #d32f2f;
 }
+
+.graph-image {
+    max-width: 100%;
+    border-radius: 10px;
+    margin-top: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.graph-label {
+    font-size: 0.85em;
+    color: #555;
+    margin-top: 4px;
+    text-align: center;
+}
+pre code {
+    background: #f7f7f8;
+    display: block;
+    padding: 10px;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}

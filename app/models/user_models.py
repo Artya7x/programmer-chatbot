@@ -22,4 +22,3 @@ class User(Base):
     created_at = Column(DateTime, default=func.now())
     conversation_id = Column(String, unique=True, nullable=False)
     role = Column(String, nullable=False)
-    decision = Column(String,nullable=True)

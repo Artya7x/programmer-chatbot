@@ -2,8 +2,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const chatContainer = document.getElementById('chat-container');
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
+    const logoutButton = document.getElementById('logout-button');
 
     let isAIThinking = false;
+    let hasSentFirstMessage = false;
 
     checkDecisionStatus();
 
@@ -27,124 +29,112 @@ document.addEventListener('DOMContentLoaded', function () {
         messageDiv.appendChild(avatar);
         messageDiv.appendChild(contentDiv);
         chatContainer.appendChild(messageDiv);
+        scrollToBottom();
 
         if (isUser) {
             contentDiv.textContent = content;
         }
 
-        scrollToBottom();
         return contentDiv;
     }
 
     function showThinkingIndicator() {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'message';
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message';
 
-    const avatar = document.createElement('div');
-    avatar.className = 'avatar bot-avatar';
-    avatar.textContent = 'AI';
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar bot-avatar';
+        avatar.textContent = 'AI';
 
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'content';
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
 
-    const thinkingDiv = document.createElement('div');
-    thinkingDiv.className = 'thinking-indicator';
+        const thinkingDiv = document.createElement('div');
+        thinkingDiv.className = 'thinking-indicator';
 
-    const spinner = document.createElement('div');
-    spinner.className = 'spinner';
+        const spinner = document.createElement('div');
+        spinner.className = 'spinner';
 
-    const text = document.createElement('div');
-    text.className = 'thinking-text';
-    text.textContent = 'AI is thinking...';
+        const text = document.createElement('div');
+        text.className = 'thinking-text';
+        text.textContent = 'AI is thinking...';
 
-    thinkingDiv.appendChild(spinner);
-    thinkingDiv.appendChild(text);
-    contentDiv.appendChild(thinkingDiv);
+        thinkingDiv.appendChild(spinner);
+        thinkingDiv.appendChild(text);
+        contentDiv.appendChild(thinkingDiv);
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(contentDiv);
+        chatContainer.appendChild(messageDiv);
 
-    messageDiv.appendChild(avatar);
-    messageDiv.appendChild(contentDiv);
-    chatContainer.appendChild(messageDiv);
+        scrollToBottom();
+        return messageDiv;
+    }
 
-    scrollToBottom();
-    return messageDiv;
+   async function getAIResponse(userMessage) {
+  const token = localStorage.getItem('access_token');
+  if (!token) throw new Error("Not authenticated");
+
+  const resp = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    body: JSON.stringify({ query: userMessage })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to fetch response.");
+  }
+
+  const data = await resp.json();
+  // data must have { role, content: [...] }
+  if (!data || !Array.isArray(data.content)) {
+    throw new Error("Malformed assistant response.");
+  }
+  return data;
 }
 
+async function sendMessage() {
+  const message = messageInput.value.trim();
+  if (message === '' || isAIThinking) return;
 
-    async function getAIResponse(userMessage) {
-        const token = localStorage.getItem('access_token');
-        if (!token) throw new Error("Not authenticated");
+  addMessage(message, true);
+  messageInput.value = '';
+  messageInput.style.height = 'auto';
+  sendButton.disabled = true;
+  isAIThinking = true;
 
-        const response = await fetch("/api/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({ query: userMessage })
-        });
+  const thinkingIndicator = showThinkingIndicator();
 
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || "Failed to fetch response.");
-        }
+  try {
+    const aiResponse = await getAIResponse(message);
+    thinkingIndicator.remove();
 
-        const data = await response.json();
-        return {
-            message: data.message,
-            decision: data.decision
-        };
+    const aiMessageElement = addMessage('', false);
 
-    }
+    aiResponse.content.forEach(item => {
+      if (item.type === "text") {
+        aiMessageElement.innerHTML += `<div class="response-card">${item.text}</div>`;
+      } else if (item.type === "code") {
+        aiMessageElement.innerHTML += `<pre class="response-card"><code>${item.text}</code></pre>`;
+      } else if (item.type === "image" && item.url) {
+        aiMessageElement.innerHTML += `
+          <div class="response-card">
+            <img src="${item.url}" alt="${item.subtype || 'graph'}" class="graph-image"/>
+            <p class="graph-label">${(item.subtype || 'graph').toUpperCase()} Graph</p>
+          </div>`;
+      }
+    });
 
-        async function sendMessage() {
-            const message = messageInput.value.trim();
-            if (message === '' || isAIThinking) return;
+  } catch (error) {
+    console.error('AI error:', error);
+    thinkingIndicator.remove();
+    addMessage("Error: " + error.message, false);
+  } finally {
+    isAIThinking = false;
+    sendButton.disabled = messageInput.value.trim() === '';
+  }
+}
 
-
-            hasSentFirstMessage = true;
-
-            addMessage(message, true);
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
-            sendButton.disabled = true;
-            isAIThinking = true;
-
-            const thinkingIndicator = showThinkingIndicator();
-
-            try {
-                const aiResponse = await getAIResponse(message);
-                const botMessage = aiResponse.message;
-                const decision = aiResponse.decision;
-
-                thinkingIndicator.remove();
-
-                let formatted = `<div class="response-card">${botMessage}</div>`;
-
-
-
-                const aiMessageElement = addMessage('', false);
-                aiMessageElement.innerHTML = formatted;
-                if (decision === "1" || decision === "0") {
-                    // Disable input and button
-                    messageInput.disabled = true;
-                    sendButton.disabled = true;
-                }
-            } catch (error) {
-                console.error('AI error:', error);
-                const aiMessageElement = addMessage("Error: " + error.message, false);
-                thinkingIndicator.remove();
-            } finally {
-                isAIThinking = false;
-                sendButton.disabled = messageInput.value.trim() === '';
-            }
-        }
-
-
-    function scrollToBottom() {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-    }
-
-    let hasSentFirstMessage = false;
 
     async function loadChatHistory() {
         const token = localStorage.getItem('access_token');
@@ -152,59 +142,57 @@ document.addEventListener('DOMContentLoaded', function () {
 
         try {
             const response = await fetch("/api/history", {
-                headers: {
-                    "Authorization": `Bearer ${token}`
-                }
+                headers: { "Authorization": `Bearer ${token}` }
             });
 
             if (!response.ok) throw new Error("Failed to fetch history");
 
             const data = await response.json();
+            const history = data.history;
 
-            for (const item of data.history) {
-                const userMsg = item.message || item.message_text;
-                const responseText = item.response || item.response_text;
+            if (!history || history.length === 0) return;
+
+            for (const item of history) {
+                const userMsg = item.message;
+                const responseText = item.response;
+                const cfgURL = item.cfg_image_url;
+                const dfgURL = item.dfg_image_url;
 
                 // Add user message
                 addMessage(userMsg, true);
 
-                // Format LLM response
-                let formatted = '';
-                try {
-                    const parsed = typeof responseText === 'string' ? JSON.parse(responseText) : responseText;
+                // Build bot message
+                const aiMessageElement = addMessage('', false);
+                aiMessageElement.innerHTML = `
+                    <div class="response-card"><pre><code>${responseText}</code></pre></div>
+                `;
 
-                    if (parsed.sources && Array.isArray(parsed.sources)) {
-                        if (parsed.sources.length === 0) {
-                            formatted = `
-                            <div class="response-card">No data sources found for your query.Try rephrasing or asking about a different domain</div>
-                        `;
-                        } else {
-                            formatted = `
-                                <div class="response-card">
-                                    ${parsed.sources.map(src => `
-                                        <div class="entry">
-                                            <div class="path">Path: ${src.path}</div>
-                                            <div class="reason">Reason: ${src.reason}</div>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            `;
-                        }
-                    } else {
-                        formatted = `<div class="response-card">${responseText}</div>`;
-                    }
-                } catch (e) {
-                    formatted = `<div class="response-card">${responseText}</div>`;
+                if (cfgURL) {
+                    aiMessageElement.innerHTML += `
+                        <div class="response-card">
+                            <img src="${cfgURL}" alt="CFG Graph" class="graph-image"/>
+                            <p class="graph-label">CFG Graph</p>
+                        </div>
+                    `;
                 }
 
-                const aiMessageElement = addMessage('', false);
-                aiMessageElement.innerHTML = formatted;
+                if (dfgURL) {
+                    aiMessageElement.innerHTML += `
+                        <div class="response-card">
+                            <img src="${dfgURL}" alt="DFG Graph" class="graph-image"/>
+                            <p class="graph-label">DFG Graph</p>
+                        </div>
+                    `;
+                }
             }
         } catch (err) {
             console.error("Failed to load chat history:", err);
         }
     }
 
+    function scrollToBottom() {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
 
     sendButton.addEventListener('click', sendMessage);
     messageInput.addEventListener('keydown', function (e) {
@@ -213,36 +201,34 @@ document.addEventListener('DOMContentLoaded', function () {
             sendMessage();
         }
     });
-    if (!hasSentFirstMessage) {
-        loadChatHistory();
-    }
-    scrollToBottom();
-    document.getElementById('logout-button').addEventListener('click', () => {
+
+    logoutButton.addEventListener('click', () => {
         localStorage.removeItem('access_token');
         window.location.href = '/login';
     });
 
     async function checkDecisionStatus() {
-            const token = localStorage.getItem('access_token');
-            if (!token) return;
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
 
-            try {
-                const res = await fetch("/api/me", {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
+        try {
+            const res = await fetch("/api/me", {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
 
-                if (!res.ok) return;
+            if (!res.ok) return;
+            const data = await res.json();
 
-                const data = await res.json();
-                if (data.decision === "1" || data.decision === "0") {
-
-                    messageInput.disabled = true;
-                    sendButton.disabled = true;
-
-                }
-            } catch (e) {
-                console.error("Failed to check decision status:", e);
+            if (data.decision === "1" || data.decision === "0") {
+                messageInput.disabled = true;
+                sendButton.disabled = true;
             }
+        } catch (e) {
+            console.error("Failed to check decision status:", e);
+        }
     }
 
+    // Load chat history on first load
+    if (!hasSentFirstMessage) loadChatHistory();
+    scrollToBottom();
 });

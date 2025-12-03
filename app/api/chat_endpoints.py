@@ -1,35 +1,26 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.models.chat_models import History
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.repositories.user_repository import get_conversation_by_user_id, save_applicant_decision
 from app.services.chat_service import process_chat_query
 from app.repositories.chat_repository import save_conversation,get_conversation_history
 from pydantic import BaseModel
+from datetime import datetime
 import asyncio
 import time
 import csv
 import os
-
-from scripts.send_email import send_email
-from scripts.save_csv import save_csv
+import uuid
+import json
+from scripts.render_graphs import render_graph
 
 router = APIRouter()
 
 # Request model
 class ChatRequest(BaseModel):
     query: str
-
-
-
-def log_response_time(duration: float):
-    """Append only response time (seconds) to a CSV file in project directory."""
-    csv_path = os.path.join(os.getcwd(), "response_times.csv")
-
-    with open(csv_path, 'a', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow([round(duration, 3)])
 
 
 # Chatbot endpoint
@@ -39,41 +30,67 @@ async def chat(request: ChatRequest,
                db: AsyncSession = Depends(get_db)):
     """Handles chatbot queries and returns AI-generated responses.
     """
-    start_time = time.perf_counter()
-    if user.decision in ("1", "0"):
-        raise HTTPException(
-            status_code=403,
-            detail="This interview has already been concluded. You will receive an email with next steps."
-        )
+
     conversation_id = await get_conversation_by_user_id(db, user.id)
-    response = process_chat_query(request.query,conversation_id, user.role)
+    response = process_chat_query(request.query,conversation_id)
     if not response:
         raise HTTPException(status_code=400, detail="Failed to generate response.")
 
-    if response.decision !="N/A":
-        await save_applicant_decision(db,user.id,response.decision)
-        send_email(user.email, response.decision, user.username)
-        print(type(response.decision))
-        if response.decision == "1":
-            save_csv(user.email, user.username)
-    await save_conversation(db, request.query, response.response, user.id)
+    if user.role == "generate code":
 
-    end_time = time.perf_counter()  # stop timing
-    duration = end_time - start_time
-    log_response_time(duration)
-    return {
-        "message": response.response,
-        "decision": response.decision
-    }
+        message_id = str(uuid.uuid4())
+        subdir = f"u{user.id}/c{conversation_id}"
 
+        cfg_path = None
+        dfg_path = None
+
+        content = []
+
+        if hasattr(response, "reasoning") and response.reasoning:
+            content.append({
+                "type": "text",
+                "subtype": "reasoning",
+                "text": response.reasoning
+            })
+
+        if response.cfg_graph and response.cfg_graph.strip():
+            cfg_path = render_graph(response.cfg_graph, subdir, f"{message_id}_cfg")
+
+        if response.dfg_graph and response.dfg_graph.strip():
+            dfg_path = render_graph(response.dfg_graph, subdir, f"{message_id}_dfg")
+
+        await save_conversation(db=db,query=request.query,response=response.python_code,user_id=user.id,cfg_image_url=cfg_path,dfg_image_url=dfg_path, reasoning = response.reasoning)
+
+        content = [{"type": "code", "language": "python", "text": response.python_code}]
+        if cfg_path:
+            content.append({"type": "image", "subtype": "cfg", "url": cfg_path})
+        if dfg_path:
+            content.append({"type": "image", "subtype": "dfg", "url": dfg_path})
+
+        return {"role": "assistant", "content": content}
+
+    else:
+        # TODO: implement other role logic here . :* <- this is an emoji ;)
+        raise HTTPException(status_code=501, detail="Optimize code mode not implemented yet.")
 
 @router.get("/history")
 async def conversation_history(user = Depends(get_current_user) ,db: AsyncSession = Depends(get_db)):
     history = await get_conversation_history(db, user.id)
     if not history:
-        return {"history": [{"message": None, "response": "Welcome! I am a chatbot programmed to make an initial interview with you for the position you have selected. Are you ready to begin?" }]}
-    return {"history" : [{"message" : h[0], "response" : h[1]} for h in history]}
+        return {"history": [{"message": None, "response": "Welcome! I am a chatbot programmed to assist you with python code" }]}
 
-@router.get("/me")
-async def get_me(user = Depends(get_current_user)):
-    return {"decision": user.decision}
+    formatted_history = []
+    for h in history:
+        message_text, response_text, cfg_url, dfg_url = h
+        entry = {
+            "message": message_text,
+            "response": response_text,
+        }
+        if cfg_url:
+            entry["cfg_image_url"] = cfg_url
+        if dfg_url:
+            entry["dfg_image_url"] = dfg_url
+        formatted_history.append(entry)
+
+    return {"history": formatted_history}
+
