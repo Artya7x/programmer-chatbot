@@ -17,3 +17,4 @@ def render_graph(dot_source: str, subdir: str, name_prefix: str):
         return f"/graphs/{subdir}/{name_prefix}.png"
     except Exception as e:
         return f"Failed to render graph: {e}"
+

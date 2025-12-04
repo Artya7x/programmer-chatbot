@@ -24,7 +24,17 @@
 
     <div class="input-container">
         <div class="input-wrapper">
-            <textarea id="message-input" placeholder="Discuss with our AI assistant about this position..." rows="1"></textarea>
+            <textarea id="message-input" placeholder="Please insert your request..." rows="1"></textarea>
+            <div class="upload-wrapper">
+                  <input type="file" id="file-input" style="display: none;" />
+                  <button id="upload-button" class="upload-btn" title="Upload File">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="25" viewBox="0 96 960 960" width="25">
+                      <path d="M480 696 280 496h120V216h160v280h120L480 696ZM200 936V696h80v160h400V696h80v240H200Z"/>
+                    </svg>
+                  </button>
+                  <div id="upload-label" class="upload-label">No file selected</div>
+            </div>
+
             <button id="send-button" disabled>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

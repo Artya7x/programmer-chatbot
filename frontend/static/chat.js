@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
   let isAIThinking = false;
   let hasSentFirstMessage = false;
 
-  checkDecisionStatus();
+  checkUserRole();
 
   messageInput.addEventListener('input', function () {
     this.style.height = 'auto';
@@ -95,11 +95,42 @@ document.addEventListener('DOMContentLoaded', function () {
     return data;
   }
 
+  async function uploadFile(file, userMessage = "") {
+    const token = localStorage.getItem("access_token");
+    if (!token) throw new Error("Not authenticated");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    if (userMessage.trim() !== "") formData.append("query", userMessage.trim());
+
+    const resp = await fetch("/api/chat/upload", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+      body: formData
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to fetch response.");
+    }
+
+    const data = await resp.json();
+    if (!data || !Array.isArray(data.content)) {
+      throw new Error("Malformed assistant response.");
+    }
+    return data;
+  }
+
+
   async function sendMessage() {
     const message = messageInput.value.trim();
-    if (message === '' || isAIThinking) return;
+    const fileInput = document.getElementById("file-input");
+    const file = fileInput ? fileInput.files[0] : null;
+    if ((message === "" && !file) || isAIThinking) return;
 
-    addMessage(message, true);
+
+    if (message) addMessage(message, true);
+    if (file) addMessage(`📄 Uploaded file: ${file.name}`, true);
     messageInput.value = '';
     messageInput.style.height = 'auto';
     sendButton.disabled = true;
@@ -108,7 +139,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const thinkingIndicator = showThinkingIndicator();
 
     try {
-      const aiResponse = await getAIResponse(message);
+      let aiResponse;
+      if (file) {
+        aiResponse = await uploadFile(file, message);
+      } else {
+        aiResponse = await getAIResponse(message);
+      }
       thinkingIndicator.remove();
 
       const aiMessageElement = addMessage('', false);
@@ -145,6 +181,7 @@ document.addEventListener('DOMContentLoaded', function () {
     } finally {
       isAIThinking = false;
       sendButton.disabled = messageInput.value.trim() === '';
+      if (fileInput) fileInput.value = "";
     }
   }
 
@@ -254,7 +291,7 @@ document.addEventListener('DOMContentLoaded', function () {
     window.location.href = '/login';
   });
 
-  async function checkDecisionStatus() {
+  async function checkUserRole() {
     const token = localStorage.getItem('access_token');
     if (!token) return;
 
@@ -264,15 +301,36 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       if (!res.ok) return;
       const data = await res.json();
-      if (data.decision === '1' || data.decision === '0') {
-        messageInput.disabled = true;
-        sendButton.disabled = true;
+
+      if (data.role === 'generate code') {
+        const uploadWrapper = document.querySelector('.upload-wrapper');
+        if (uploadWrapper) uploadWrapper.style.display = 'none';
       }
+
     } catch (e) {
-      console.error('Failed to check decision status:', e);
+      console.error('Failed to check user role:', e);
     }
   }
 
+
   if (!hasSentFirstMessage) loadChatHistory();
   scrollToBottom();
+
+  const uploadButton = document.getElementById("upload-button");
+  const fileInput = document.getElementById("file-input");
+
+  uploadButton.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+      const selectedFile = fileInput.files[0];
+      const uploadLabel = document.getElementById("upload-label");
+
+      if (selectedFile) {
+        uploadLabel.textContent = `📄 Selected: ${selectedFile.name}`;
+        uploadLabel.style.color = "#007bff";
+      } else {
+        uploadLabel.textContent = "No file selected";
+        uploadLabel.style.color = "#666";
+      }
+  });
+
 });
