@@ -163,12 +163,15 @@ document.addEventListener('DOMContentLoaded', function () {
               <pre><code class="language-python">${item.text}</code></pre>
             </div>`;
         } else if (item.type === 'image' && item.url) {
-          aiMessageElement.innerHTML += `
-            <div class="response-card graph-card">
-              <img src="${item.url}" alt="${item.subtype || 'graph'}" class="graph-image"/>
-              <p class="graph-label">${(item.subtype || 'graph').toUpperCase()} Graph</p>
-            </div>`;
-        }
+  const funcName = item.function ? `<strong>${item.function}</strong>` : "Unknown Function";
+  aiMessageElement.innerHTML += `
+    <div class="response-card graph-card">
+      <div class="graph-header">${(item.subtype || 'graph').toUpperCase()} for ${funcName}</div>
+      <img src="${item.url}" alt="${item.subtype || 'graph'}" class="graph-image"/>
+      <p class="graph-label">Function: ${funcName}</p>
+    </div>`;
+}
+
       });
 
       // Apply syntax highlighting after rendering
@@ -185,94 +188,97 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-    async function loadChatHistory() {
-    const token = localStorage.getItem('access_token');
-    if (!token) return;
+async function loadChatHistory() {
+  const token = localStorage.getItem('access_token');
+  if (!token) return;
 
-    try {
-      const response = await fetch('/api/history', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+  try {
+    const response = await fetch('/api/history', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-      if (!response.ok) throw new Error('Failed to fetch history');
+    if (!response.ok) throw new Error('Failed to fetch history');
 
-      const data = await response.json();
-      const history = data.history;
-      if (!history || history.length === 0) return;
+    const data = await response.json();
+    const history = data.history;
+    if (!history || history.length === 0) return;
 
-      for (const item of history) {
-        const userMsg = item.message;
-        const responseText = item.response;
-        const cfgURL = item.cfg_image_url;
-        const dfgURL = item.dfg_image_url;
-        const reasoning = item.reasoning;
+    for (const item of history) {
+      const userMsg = item.message;
+      const responseText = item.response;
+      const cfgURLs = item.cfg_image_urls || {};
+      const dfgURLs = item.dfg_image_urls || {};
+      const reasoning = item.reasoning;
 
-        // Handle the welcome message case — no userMsg and contains "Welcome!"
-        const isWelcome =
-          !userMsg &&
-          responseText &&
-          responseText.includes('Welcome! I am a chatbot programmed to assist you');
+      // Handle the welcome message case — no userMsg and contains "Welcome!"
+      const isWelcome =
+        !userMsg &&
+        responseText &&
+        responseText.includes('Welcome! I am a chatbot programmed to assist you');
 
-        if (isWelcome) {
-          const aiMessageElement = addMessage('', false);
-
-          // hide the AI avatar for the welcome message
-          const avatar = aiMessageElement.parentElement.querySelector('.avatar');
-          if (avatar) avatar.style.visibility = 'hidden';
-
-          aiMessageElement.innerHTML += `
-            <div class="welcome-message">
-              <span class="welcome-highlight">Welcome!</span>
-              <span class="welcome-text"> I am a chatbot programmed to assist you with Python code.</span>
-            </div>`;
-          continue;
-        }
-
-
-
-        // Normal chat history rendering
-        addMessage(userMsg, true);
+      if (isWelcome) {
         const aiMessageElement = addMessage('', false);
 
-        if (reasoning) {
-          aiMessageElement.innerHTML += `
-            <div class="response-card reasoning-card">
-              <div class="reasoning-header">Explanation</div>
-              <div class="reasoning-body">${reasoning}</div>
-            </div>`;
-        }
+        // hide the AI avatar for the welcome message
+        const avatar = aiMessageElement.parentElement.querySelector('.avatar');
+        if (avatar) avatar.style.visibility = 'hidden';
 
-        if (responseText) {
-          aiMessageElement.innerHTML += `
-            <div class="response-card code-card">
-              <div class="code-header">💻 Python Code</div>
-              <pre><code class="language-python">${responseText}</code></pre>
-            </div>`;
-        }
-
-        if (cfgURL) {
-          aiMessageElement.innerHTML += `
-            <div class="response-card graph-card">
-              <img src="${cfgURL}" alt="CFG Graph" class="graph-image"/>
-              <p class="graph-label">CFG Graph</p>
-            </div>`;
-        }
-
-        if (dfgURL) {
-          aiMessageElement.innerHTML += `
-            <div class="response-card graph-card">
-              <img src="${dfgURL}" alt="DFG Graph" class="graph-image"/>
-              <p class="graph-label">DFG Graph</p>
-            </div>`;
-        }
+        aiMessageElement.innerHTML += `
+          <div class="welcome-message">
+            <span class="welcome-highlight">Welcome!</span>
+            <span class="welcome-text">
+              I am a chatbot programmed to assist you with Python code.
+            </span>
+          </div>`;
+        continue;
       }
 
-      if (window.hljs) hljs.highlightAll();
-    } catch (err) {
-      console.error('Failed to load chat history:', err);
-    }
-  }
+      // Normal chat history rendering
+      addMessage(userMsg, true);
+      const aiMessageElement = addMessage('', false);
 
+      if (reasoning) {
+        aiMessageElement.innerHTML += `
+          <div class="response-card reasoning-card">
+            <div class="reasoning-header">Explanation</div>
+            <div class="reasoning-body">${reasoning}</div>
+          </div>`;
+      }
+
+      if (responseText) {
+        aiMessageElement.innerHTML += `
+          <div class="response-card code-card">
+            <div class="code-header">💻 Python Code</div>
+            <pre><code class="language-python">${responseText}</code></pre>
+          </div>`;
+      }
+
+      // Render all CFG graphs (per function)
+      for (const [funcName, url] of Object.entries(cfgURLs)) {
+        aiMessageElement.innerHTML += `
+          <div class="response-card graph-card">
+            <div class="graph-header">CFG for <strong>${funcName}</strong></div>
+            <img src="${url}" alt="CFG Graph for ${funcName}" class="graph-image"/>
+            <p class="graph-label">Control Flow Graph</p>
+          </div>`;
+      }
+
+      // Render all DFG graphs (per function)
+      for (const [funcName, url] of Object.entries(dfgURLs)) {
+        aiMessageElement.innerHTML += `
+          <div class="response-card graph-card">
+            <div class="graph-header">DFG for <strong>${funcName}</strong></div>
+            <img src="${url}" alt="DFG Graph for ${funcName}" class="graph-image"/>
+            <p class="graph-label">Data Flow Graph</p>
+          </div>`;
+      }
+    } // <-- closes "for (const item of history)"
+
+    if (window.hljs) hljs.highlightAll();
+  } catch (err) {
+    console.error('Failed to load chat history:', err);
+  }
+}
 
   function scrollToBottom() {
     chatContainer.scrollTop = chatContainer.scrollHeight;

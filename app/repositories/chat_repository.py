@@ -3,8 +3,8 @@ from sqlalchemy.exc import IntegrityError
 from app.models.chat_models import History
 from sqlalchemy.future import select
 
-async def save_conversation(db: AsyncSession, query: str, response: str, user_id: int, cfg_image_url: str = None, dfg_image_url: str = None, reasoning: str = None):
-    new_history = History(user_id=user_id,message_text=query,response_text=response, cfg_image_url=cfg_image_url, dfg_image_url=dfg_image_url, reasoning = reasoning)
+async def save_conversation(db: AsyncSession, query: str, response: str, user_id: int, cfg_image_urls: dict = None, dfg_image_urls: dict = None, reasoning: str = None):
+    new_history = History(user_id=user_id,message_text=query,response_text=response,  cfg_image_urls=cfg_image_urls, dfg_image_urls=dfg_image_urls, reasoning = reasoning)
     db.add(new_history)
     try:
         await db.commit()
@@ -17,7 +17,7 @@ async def save_conversation(db: AsyncSession, query: str, response: str, user_id
 async def get_conversation_history(db: AsyncSession, user_id: int):
     """Fetches the conversation history for a user, ordered by timestamp."""
     result = await db.execute(
-        select(History.message_text, History.response_text, History.cfg_image_url, History.dfg_image_url, History.reasoning)
+        select(History.message_text, History.response_text,  History.cfg_image_urls, History.dfg_image_urls, History.reasoning)
         .where(History.user_id == user_id)
         .order_by(History.timestamp.asc())
     )

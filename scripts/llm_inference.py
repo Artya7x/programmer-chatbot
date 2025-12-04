@@ -1,9 +1,11 @@
 from openai import OpenAI
 import os
 from dotenv import load_dotenv
+
+from typing import List
 from pydantic import BaseModel
 
-
+from typing import Dict
 # Load environment variables from .env
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -13,12 +15,15 @@ if not OPENAI_API_KEY:
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-class ModelResponse(BaseModel):
-    python_code : str
-    cfg_graph : str
-    dfg_graph : str
-    reasoning: str
+class GraphItem(BaseModel):
+    function_name: str
+    dot_source: str
 
+class ModelResponse(BaseModel):
+    python_code: str
+    cfg_graphs: List[GraphItem]
+    dfg_graphs: List[GraphItem]
+    reasoning: str
 
 def generate_response(model, prompt, conversation_id):
     """
@@ -33,42 +38,65 @@ def generate_response(model, prompt, conversation_id):
     try:
         response = client.responses.parse(
             model=model,
-            instructions ="""
-            
+            instructions="""
             Role:
-                You are an intelligent programming assistant. Your purpose is to generate Python code, a Control Flow Graph (CFG), and a Data Flow Graph (DFG) based on natural language descriptions provided by the user.
-            
+                You are an intelligent programming assistant. Your purpose is to generate Python code, a Control Flow Graph (CFG), and a Data Flow Graph (DFG) for each function described by the user.
+                However, you must also be context-aware and adapt to conversational or non-coding inputs.
+
+            Context Awareness:
+                - If the user's input is **not** a programming-related request (e.g., a greeting, question about yourself, or general chat), respond naturally **without generating code or graphs**.
+                - If the user asks a **conceptual programming question** (e.g., “What is recursion?” or “Explain decorators”), provide a clear explanation **without code or graphs** unless the user explicitly asks for code.
+                - Only generate Python code and corresponding CFG/DFG graphs when the user's message explicitly asks you to **write**, **implement**, **generate**, or **optimize** code.
+
             Task:
-                When a user provides a functional description in natural language:
+                When the user provides a programming or code-related request:
 
-                    1) Search the knowledge base for relevant information or examples related to the requested functionality.
+                    1) Search your knowledge base for relevant examples or prior implementations.
+                    2) Use the retrieved information to guide your reasoning and produce the following:
 
-                    2) Use the retrieved knowledge to guide your reasoning and code generation.
+                       a) One or more complete and runnable Python functions.
+                       b) For **each function**, generate:
+                          - A Control Flow Graph (CFG) showing the execution order of statements.
+                          - A Data Flow Graph (DFG) showing how variables and data move between operations.
 
-                    3) Produce the following outputs:
+            Important Rules:
+                - Every function that appears in the generated Python code **must** have both a CFG and a DFG entry.
+                - Each graph must be written in valid Graphviz DOT format, starting with `digraph CFG { ... }` or `digraph DFG { ... }`.
+                - Each graph must use the function name as its identifier inside the DOT structure, e.g.:
+                    digraph CFG_add {
+                        A -> B;
+                    }
+                - The JSON output must exactly match the structure below, with no extra text, markdown, or commentary.
 
-                       3.1) Valid and complete Python function code.
+            Response Format:
+            {
+              "python_code": "<full Python program containing all functions or None>",
+              "cfg_graphs": [
+                { "function_name": "<function_name>", "dot_source": "<Graphviz DOT for CFG>" },
+                ...
+              ] or None,
+              "dfg_graphs": [
+                { "function_name": "<function_name>", "dot_source": "<Graphviz DOT for DFG>" },
+                ...
+              ] or None,
+              "reasoning": "<short explanation of the generated code and its graphs, or the assistant’s natural response if not code-related>"
+            }
 
-                       3.2) A Control Flow Graph (CFG) written in Graphviz DOT format that represents the execution order of the function’s statements.
-
-                       3.3) A Data Flow Graph (DFG) written in Graphviz DOT format that represents how data and variables are defined and used within the function.
-                    
-            Response Format : 
-            
-                {
-                    "python_code": "<Python function code>",
-                    "cfg_graph": "<Control Flow Graph in Graphviz DOT format>",
-                    "dfg_graph": "<Data Flow Graph in Graphviz DOT format>"
-                }
-                
             Behavior Rules:
-                1) Always search and use the knowledge base before generating an answer.
-                2) Both graphs must follow the Graphviz DOT syntax (e.g., start with digraph CFG { ... } and digraph DFG { ... }).
-                3) Ensure the JSON is syntactically valid and contains only the three required keys
-                4) When you provide the code and the graphs, please write a small description of what you give to the user
+                1) Always ensure the JSON output matches the Response Format exactly.
+                2) If the user is not asking for code, set:
+                    - "python_code" -> None
+                    - "cfg_graphs" -> None
+                    - "dfg_graphs" -> None
+                    and place your full written response inside "reasoning".
+                3) Do not include markdown formatting, comments, or text outside the JSON.
+                4) Ensure all generated Python code is syntactically valid.
+                5) All CFG and DFG outputs must follow proper DOT syntax.
+                6) Always produce **one CFG and one DFG per function** when applicable.
+                7) The "reasoning" field should summarize your logic and explain how the graphs correspond to the code or provide a standalone textual answer if no code was produced.
             """,
 
-            input=prompt,
+        input=prompt,
             conversation = conversation_id,
             tools=[{
                 "type": "file_search",

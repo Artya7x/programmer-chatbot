@@ -29,12 +29,15 @@ async def chat(request: ChatRequest,
     if not response:
         raise HTTPException(status_code=400, detail="Failed to generate response.")
 
+    if isinstance(response, str):
+        raise HTTPException(status_code=500, detail=response)
+
     if user.role == "generate code":
         message_id = str(uuid.uuid4())
         subdir = f"u{user.id}/c{conversation_id}"
 
-        cfg_path = None
-        dfg_path = None
+        cfg_paths = {}
+        dfg_paths = {}
 
         content = []
 
@@ -52,29 +55,39 @@ async def chat(request: ChatRequest,
                 "text": response.python_code
             })
 
-        if response.cfg_graph and response.cfg_graph.strip():
-            cfg_path = render_graph(response.cfg_graph, subdir, f"{message_id}_cfg")
-            content.append({
-                "type": "image",
-                "subtype": "cfg",
-                "url": cfg_path
-            })
+        if hasattr(response, "cfg_graphs") and response.cfg_graphs:
+            for graph_item in response.cfg_graphs:
+                func_name = graph_item.function_name
+                dot_src = graph_item.dot_source
+                path = render_graph(dot_src, subdir, f"{message_id}_{func_name}_cfg")
+                cfg_paths[func_name] = path
+                content.append({
+                    "type": "image",
+                    "subtype": "cfg",
+                    "function": func_name,
+                    "url": path
+                })
 
-        if response.dfg_graph and response.dfg_graph.strip():
-            dfg_path = render_graph(response.dfg_graph, subdir, f"{message_id}_dfg")
-            content.append({
-                "type": "image",
-                "subtype": "dfg",
-                "url": dfg_path
-            })
+        if hasattr(response, "dfg_graphs") and response.dfg_graphs:
+            for graph_item in response.dfg_graphs:
+                func_name = graph_item.function_name
+                dot_src = graph_item.dot_source
+                path = render_graph(dot_src, subdir, f"{message_id}_{func_name}_dfg")
+                dfg_paths[func_name] = path
+                content.append({
+                    "type": "image",
+                    "subtype": "dfg",
+                    "function": func_name,
+                    "url": path
+                })
 
         await save_conversation(
             db=db,
             query=request.query,
             response=response.python_code,
             user_id=user.id,
-            cfg_image_url=cfg_path,
-            dfg_image_url=dfg_path,
+            cfg_image_urls=cfg_paths,
+            dfg_image_urls=dfg_paths,
             reasoning=response.reasoning
         )
 
@@ -111,28 +124,34 @@ async def chat(request: ChatRequest,
         return {"role": "assistant", "content": content}
 
 @router.get("/history")
-async def conversation_history(user = Depends(get_current_user) ,db: AsyncSession = Depends(get_db)):
+async def conversation_history(
+    user = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     history = await get_conversation_history(db, user.id)
     if not history:
-        return {"history": [{"message": None, "response": "Welcome! I am a chatbot programmed to assist you with python code" }]}
+        return {
+            "history": [
+                {
+                    "message": None,
+                    "response": "Welcome! I am a chatbot programmed to assist you with Python code."
+                }
+            ]
+        }
 
     formatted_history = []
-    for h in history:
-        message_text, response_text, cfg_url, dfg_url, reasoning = h
+    for message_text, response_text, cfg_urls, dfg_urls, reasoning in history:
         entry = {
             "message": message_text,
             "response": response_text,
+            "cfg_image_urls": cfg_urls or {},
+            "dfg_image_urls": dfg_urls or {},
+            "reasoning": reasoning or "",
         }
-        if cfg_url:
-            entry["cfg_image_url"] = cfg_url
-        if dfg_url:
-            entry["dfg_image_url"] = dfg_url
-
-        if reasoning:
-            entry["reasoning"] = reasoning
         formatted_history.append(entry)
 
     return {"history": formatted_history}
+
 
 @router.post("/chat/upload")
 async def chat_upload(

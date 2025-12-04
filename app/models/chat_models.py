@@ -1,6 +1,6 @@
 from sqlalchemy import Column, DateTime, func, Integer, ForeignKey, Text, String
 from app.core.database import Base
-
+from sqlalchemy.dialects.sqlite import JSON
 """
 map user's conversation history with the chatbot in db
 class History:
@@ -17,7 +17,7 @@ class History(Base):
     message_text = Column(Text, nullable=False)
     response_text = Column(Text, nullable=False)
 
-    cfg_image_url = Column(String, nullable=True)
-    dfg_image_url = Column(String, nullable=True)
+    cfg_image_urls = Column(JSON, nullable=True)
+    dfg_image_urls = Column(JSON, nullable=True)
     reasoning = Column(String, nullable=False)
     timestamp = Column(DateTime, default=func.now())
