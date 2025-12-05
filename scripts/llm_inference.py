@@ -70,7 +70,7 @@ def generate_response(model, prompt, conversation_id):
 
             Response Format:
             {
-              "python_code": "<full Python program containing all functions or None>",
+              "python_code": <full Python program as string, or null if none>,
               "cfg_graphs": [
                 { "function_name": "<function_name>", "dot_source": "<Graphviz DOT for CFG>" },
                 ...
@@ -85,9 +85,9 @@ def generate_response(model, prompt, conversation_id):
             Behavior Rules:
                 1) Always ensure the JSON output matches the Response Format exactly.
                 2) If the user is not asking for code, set:
-                    - "python_code" -> None
-                    - "cfg_graphs" -> None
-                    - "dfg_graphs" -> None
+                     - "python_code": null
+                     - "cfg_graphs": null
+                     - "dfg_graphs": null
                     and place your full written response inside "reasoning".
                 3) Do not include markdown formatting, comments, or text outside the JSON.
                 4) Ensure all generated Python code is syntactically valid.

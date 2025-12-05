@@ -48,11 +48,11 @@ async def chat(request: ChatRequest,
                 "text": response.reasoning
             })
 
-        if response.python_code and response.python_code.strip():
+        if hasattr(response, "python_code") and response.python_code and response.python_code.strip().lower() not in ("none", "null"):
             content.append({
                 "type": "code",
                 "language": "python",
-                "text": response.python_code
+                "text": response.python_code.strip()
             })
 
         if hasattr(response, "cfg_graphs") and response.cfg_graphs:
@@ -81,10 +81,18 @@ async def chat(request: ChatRequest,
                     "url": path
                 })
 
+        code_to_save = (
+            response.python_code.strip()
+            if hasattr(response, "python_code")
+               and response.python_code
+               and response.python_code.strip().lower() not in ("none", "null")
+            else ""
+        )
+
         await save_conversation(
             db=db,
             query=request.query,
-            response=response.python_code,
+            response=code_to_save,
             user_id=user.id,
             cfg_image_urls=cfg_paths,
             dfg_image_urls=dfg_paths,
@@ -104,20 +112,29 @@ async def chat(request: ChatRequest,
                 "text": response.reasoning
             })
 
-        if hasattr(response, "python_code") and response.python_code.strip():
+        if hasattr(response, "python_code") and response.python_code and response.python_code.strip().lower() not in (
+        "none", "null"):
             content.append({
                 "type": "code",
                 "language": "python",
-                "text": response.python_code
+                "text": response.python_code.strip()
             })
+
+        code_to_save = (
+            response.python_code.strip()
+            if hasattr(response, "python_code")
+               and response.python_code
+               and response.python_code.strip().lower() not in ("none", "null")
+            else ""
+        )
 
         await save_conversation(
             db=db,
             query=request.query,
-            response=response.python_code,
+            response=code_to_save,
             user_id=user.id,
-            cfg_image_url=None,
-            dfg_image_url=None,
+            cfg_image_urls=None,
+            dfg_image_urls=None,
             reasoning=response.reasoning
         )
 

@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function () {
               <div class="reasoning-header">Explanation</div>
               <div class="reasoning-body">${item.text}</div>
             </div>`;
-        } else if (item.type === 'code') {
+        } else if (item.type === 'code' && item.text && item.text.trim().toLowerCase() !== 'none' ) {
           aiMessageElement.innerHTML += `
             <div class="response-card code-card">
               <div class="code-header">💻 Python Code</div>
