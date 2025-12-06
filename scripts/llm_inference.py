@@ -97,12 +97,12 @@ def generate_response(model, prompt, conversation_id):
             """,
 
         input=prompt,
-            conversation = conversation_id,
-            tools=[{
-                "type": "file_search",
-                "vector_store_ids": ["vs_6910d22afa4081918b2009351a3af3da"]
-            }],
-            text_format=ModelResponse
+        conversation = conversation_id,
+        tools=[{
+            "type": "file_search",
+            "vector_store_ids": ["vs_6910d22afa4081918b2009351a3af3da"]
+        }],
+        text_format=ModelResponse
         )
         print(response.output_parsed)
         return response.output_parsed
